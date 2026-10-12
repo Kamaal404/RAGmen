@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/ragmen-kitchen.png" alt="RAGmen" width="200"/>
+<img src="assets/originals/ragmen-logo.png" alt="RAGmen" width="220"/>
 
 # RAGmen
 
