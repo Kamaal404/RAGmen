@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block extrahead %}
+  {%- set page_url = config.site_url ~ page.url -%}
+  {%- set page_title = page.title ~ " — " ~ config.site_name -%}
+  {%- set page_desc = page.meta.description if page.meta and page.meta.description else config.site_description -%}
+  {%- set og_image = config.site_url ~ "assets/ragmen-logo.png" -%}
+
+  {# Canonical #}
+  <link rel="canonical" href="{{ page_url }}"/>
+
+  {# Open Graph #}
+  <meta property="og:type" content="website"/>
+  <meta property="og:site_name" content="{{ config.site_name }}"/>
+  <meta property="og:title" content="{{ page_title }}"/>
+  <meta property="og:description" content="{{ page_desc }}"/>
+  <meta property="og:url" content="{{ page_url }}"/>
+  <meta property="og:image" content="{{ og_image }}"/>
+  <meta property="og:image:width" content="512"/>
+  <meta property="og:image:height" content="512"/>
+  <meta property="og:image:alt" content="RAGmen — GraphRAG framework"/>
+
+  {# Twitter Card #}
+  <meta name="twitter:card" content="summary"/>
+  <meta name="twitter:title" content="{{ page_title }}"/>
+  <meta name="twitter:description" content="{{ page_desc }}"/>
+  <meta name="twitter:image" content="{{ og_image }}"/>
+
+  {# Standard meta description #}
+  <meta name="description" content="{{ page_desc }}"/>
+
+  {# JSON-LD: SoftwareApplication — helps LLMs cite the tool accurately #}
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "RAGmen",
+    "url": "{{ config.site_url }}",
+    "applicationCategory": "DeveloperApplication",
+    "operatingSystem": "Windows, macOS, Linux",
+    "description": "{{ config.site_description }}",
+    "softwareVersion": "0.1.0",
+    "license": "https://opensource.org/licenses/MIT",
+    "codeRepository": "https://github.com/Kamaal404/RAGmen",
+    "author": {
+      "@type": "Person",
+      "name": "Kamaal404",
+      "url": "https://github.com/Kamaal404"
+    },
+    "keywords": [
+      "GraphRAG", "knowledge graph", "RAG", "Neo4j",
+      "document retrieval", "knowledge extraction",
+      "MCP", "Python", "NLP", "entity extraction",
+      "citation", "open source"
+    ],
+    "featureList": [
+      "Schema-grounded knowledge graph extraction",
+      "Hybrid retrieval: vector + keyword + graph traversal",
+      "Content-addressed resumable extraction pipeline",
+      "Multi-source conflict detection and surfacing",
+      "MCP-compatible retrieval server",
+      "Blueprint design system with human approval gate",
+      "Enforced citations on every answer",
+      "Neo4j backend with in-memory fallback"
+    ]
+  }
+  </script>
+
+  {# JSON-LD: WebPage — gives LLMs the page identity and description #}
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    "name": "{{ page_title }}",
+    "url": "{{ page_url }}",
+    "description": "{{ page_desc }}",
+    "isPartOf": {
+      "@type": "WebSite",
+      "name": "{{ config.site_name }}",
+      "url": "{{ config.site_url }}"
+    }
+  }
+  </script>
+{% endblock %}

@@ -2,10 +2,11 @@
 hide:
   - navigation
   - toc
+description: RAGmen is an open source GraphRAG framework. Turn any PDF or document corpus into a schema-grounded Neo4j knowledge graph and get cited answers via MCP.
 ---
 
 <div align="center" style="padding: 2rem 0 1rem;">
-  <img src="assets/originals/ragmen-logo.png" width="160" alt="RAGmen logo"/>
+  <img src="assets/ragmen-logo.png" width="160" alt="RAGmen logo"/>
   <h1 style="font-size: 2.8rem; margin: 0.5rem 0 0.2rem;">RAGmen</h1>
   <p style="font-size: 1.25rem; color: var(--md-default-fg-color--light);">
     <strong>Noodles are nodes. Instant GraphRAG without the long cooking.</strong>

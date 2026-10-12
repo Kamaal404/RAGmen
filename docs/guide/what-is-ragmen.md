@@ -1,3 +1,7 @@
+---
+description: RAGmen builds a schema-grounded knowledge graph from your documents and answers questions with exact citations. Learn how it differs from plain AI chat and vector RAG.
+---
+
 # What is RAGmen?
 
 ## The problem

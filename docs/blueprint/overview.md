@@ -1,7 +1,11 @@
+---
+description: A RAGmen blueprint is the schema that defines what to extract from your documents. Design it once before any AI cost is spent. Learn what a blueprint controls and why it matters.
+---
+
 # Blueprint — Overview
 
 <div align="center">
-  <img src="../../assets/originals/ragmen-recipe.png" width="160" alt="RAGmen Recipe"/>
+  <img src="../../assets/ragmen-recipe.png" width="160" alt="RAGmen Recipe"/>
 </div>
 
 A blueprint is the design document that tells RAGmen what to look for in your corpus. It is the most important decision you make in the whole process — and the cheapest, because it happens before any AI cost is spent.

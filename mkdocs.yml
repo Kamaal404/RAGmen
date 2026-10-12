@@ -1,5 +1,5 @@
 site_name: RAGmen
-site_description: Turn documents into a knowledge graph. Ask questions. Get cited answers.
+site_description: Turn any document corpus into a schema-grounded knowledge graph and a read-only retrieval layer. Ask questions, get cited answers. Open source GraphRAG framework built on Neo4j.
 site_url: https://kamaal404.github.io/RAGmen
 repo_url: https://github.com/Kamaal404/RAGmen
 repo_name: Kamaal404/RAGmen
@@ -7,8 +7,9 @@ edit_uri: edit/main/docs/
 
 theme:
   name: material
-  logo: assets/originals/ragmen-logo.png
-  favicon: assets/originals/ragmen-logo.png
+  custom_dir: overrides
+  logo: assets/ragmen-logo.png
+  favicon: assets/ragmen-logo.png
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
@@ -69,6 +70,7 @@ markdown_extensions:
   - tables
   - toc:
       permalink: true
+  - meta
 
 nav:
   - Home: index.md
@@ -90,6 +92,7 @@ extra:
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/Kamaal404/RAGmen
+      name: RAGmen on GitHub
   analytics:
     feedback:
       title: Was this page helpful?

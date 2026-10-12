@@ -1,0 +1,57 @@
+# RAGmen
+
+> Turn any document corpus into a schema-grounded knowledge graph and a read-only retrieval layer. Ask questions, get cited answers.
+
+RAGmen is an open source GraphRAG framework. It converts unstructured documents (PDF, Markdown, plain text) into a Neo4j knowledge graph using a schema approved by the user before any AI cost is spent, then serves cited answers over the Model Context Protocol (MCP).
+
+## What RAGmen is
+
+- A **three-component pipeline**: Blueprint (design) → Forge (build) → Serve + Agent (query)
+- Every answer includes the **exact source document and page number**
+- The AI is **strictly limited to your documents** — it refuses to answer from general knowledge
+- When two documents **disagree**, both answers are shown with attribution
+- Re-adding an **unchanged file costs nothing** — content-addressed deduplication
+- **Interrupted runs resume** from the last completed chunk — never pay twice
+
+## Components
+
+- **forge** — build-time CLI: `forge add`, `forge cook`, `forge retract`, `forge conflicts`
+- **lattice-serve** — read-only MCP server with hybrid retrieval (vector + keyword + graph, RRF fusion)
+- **agent** — answer policy layer: enforced citations, conflict surfacing, corpus-only answers
+- **blueprint** — design-time schema system with human approval gate before extraction
+
+## Technology
+
+- Python 3.11+
+- Neo4j graph database (Docker)
+- OpenAI (extraction) with prompt caching
+- sentence-transformers (local embeddings)
+- MCP (Model Context Protocol) for retrieval
+- RapidFuzz for entity resolution
+
+## Use cases
+
+- Law firms querying contract archives
+- Technical writers querying product manuals
+- Policy teams querying regulatory documents
+- Researchers querying scientific literature
+- Anyone who needs cited, corpus-only answers from a body of documents
+
+## Key differentiators from plain RAG
+
+- **Closed schema**: the AI cannot invent entity types or relationships outside the approved blueprint
+- **Graph traversal**: multi-hop questions that require following relationships across the document
+- **Conflict detection**: explicit disagreement surfacing instead of silent last-write-wins
+- **Provenance**: every edge in the graph carries the source chunk and character range
+
+## Repository
+
+https://github.com/Kamaal404/RAGmen
+
+## Documentation
+
+https://kamaal404.github.io/RAGmen
+
+## License
+
+MIT

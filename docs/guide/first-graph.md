@@ -1,7 +1,11 @@
+---
+description: End-to-end walkthrough — add a PDF, extract a knowledge graph with forge cook, start the MCP server, and ask a cited question with agent ask.
+---
+
 # Your First Graph
 
 <div align="center">
-  <img src="../../assets/originals/ragmen-kitchen.png" width="160" alt="RAGmen Kitchen"/>
+  <img src="../../assets/ragmen-kitchen.png" width="160" alt="RAGmen Kitchen"/>
 </div>
 
 This guide walks you through the complete workflow — from a raw PDF to asking a cited question. We use the example document included with RAGmen (a fire-building manual) so you can follow along immediately.

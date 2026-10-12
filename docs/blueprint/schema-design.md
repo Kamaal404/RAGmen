@@ -1,3 +1,7 @@
+---
+description: Seven steps to designing a GraphRAG schema for your corpus. How to choose node types, relationship types, patterns, and guardrails that answer real questions.
+---
+
 # Designing a Schema
 
 This guide walks through the five steps of designing a blueprint schema for a new corpus.

@@ -1,3 +1,7 @@
+---
+description: Reference for lattice-serve, the read-only MCP retrieval server. Covers search, expand, cite, explain_path, and schema tools with hybrid RRF retrieval and guardrail enforcement.
+---
+
 # `lattice-serve` — Command Reference
 
 Lattice Serve is the read-only MCP retrieval server. It never writes to the graph. Start it once and leave it running while users ask questions.

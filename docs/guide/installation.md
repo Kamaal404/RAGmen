@@ -1,3 +1,7 @@
+---
+description: Install RAGmen on Windows, macOS, or Linux. Requires Python 3.11+, Docker Desktop, and an OpenAI API key. Step-by-step setup guide.
+---
+
 # Installation
 
 Get RAGmen running from scratch in about 10 minutes.

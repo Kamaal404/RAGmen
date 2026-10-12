@@ -1,3 +1,7 @@
+---
+description: Complete reference for the forge CLI — forge add, forge cook, forge extract, forge retract, forge conflicts, and forge blueprint. Every option with examples.
+---
+
 # `forge` — Command Reference
 
 Forge is the build-time tool. It registers documents, chunks them, extracts knowledge, and writes the graph. Run `forge --help` at any time.
