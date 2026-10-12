@@ -1,0 +1,22 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.text-cache/
+blueprints/*.local.yaml
+.DS_Store
+.env
+
+# Separate public demo repository. Keep its working tree out of the private
+# Lattice repository until it has its own Git history and remote.
+/fire-graph/
+
+# Local and copyrighted demo inputs/artifacts.
+/*.pdf
+/.omo/
+/runofline.txt
+
+# Forge build artifacts
+*.egg-info/
+*.db
+forge-dry-run/

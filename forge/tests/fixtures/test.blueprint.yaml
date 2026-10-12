@@ -1,0 +1,50 @@
+blueprint_version: 1.0.0
+name: test
+description: Test blueprint for forge phase 1
+structure:
+  source_types: [markdown, text]
+  hierarchy:
+    - level: chapter
+      pattern: '^#\s+(.+)$'
+      example: '# Introduction'
+    - level: section
+      pattern: '^##\s+(.+)$'
+      example: '## Setup'
+  chunk_at: section
+  max_chunk_chars: 5000
+ontology:
+  closed: true
+  node_types:
+    - label: Topic
+      description: A subject discussed in the text.
+      answers: "What is this about?"
+      properties:
+        - {name: name, type: STRING, required: true}
+    - label: Reference
+      description: A referenced item.
+      answers: "What is referenced?"
+      properties:
+        - {name: name, type: STRING, required: true}
+  relationship_types:
+    - label: MENTIONS
+      description: The topic mentions this reference.
+  patterns:
+    - [Topic, MENTIONS, Reference]
+embedding:
+  model: all-MiniLM-L6-v2
+  dimensions: 384
+  targets:
+    - name: chunk_text
+      of: Chunk
+      text: "{path}\n\n{text}"
+workload:
+  shapes:
+    - id: what_is
+      kind: lookup
+      example: "what is this about"
+      hops: 0
+    - id: find_refs
+      kind: multi_hop
+      example: "what references are mentioned"
+      hops: 1
+      must_traverse: [MENTIONS]

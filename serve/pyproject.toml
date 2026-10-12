@@ -1,0 +1,30 @@
+[project]
+name = "lattice-serve"
+version = "0.1.0"
+description = "Read-only MCP retrieval server with hybrid search, traversal, and guardrails"
+requires-python = ">=3.11"
+dependencies = [
+    "mcp>=1.0.0",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+memory = ["lattice-forge"]
+dev = ["lattice-forge", "pytest", "pytest-asyncio"]
+
+[project.scripts]
+lattice-serve = "serve.mcp_server:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["--strict-config", "--strict-markers", "--asyncio-mode=auto"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 300
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101"]

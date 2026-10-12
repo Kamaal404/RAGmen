@@ -1,0 +1,6 @@
+blueprint_version: 1.0.0
+name: 42
+structure: {}
+ontology: {node_types: [], relationship_types: [], patterns: [], closed: true}
+embedding: {model: test, dimensions: 128, targets: [{}]}
+workload: {}

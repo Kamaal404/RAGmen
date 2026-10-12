@@ -1,0 +1,357 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Kamaal404/lattice/spec/blueprint.schema.json",
+  "title": "Lattice Blueprint",
+  "description": "The contract between Blueprint (design time), Forge (build time) and Serve (query time). Forge and Serve make no ontology decisions; if either needs to decide what something means, this document is incomplete.",
+  "type": "object",
+  "required": ["blueprint_version", "name", "structure", "ontology", "embedding", "workload"],
+  "additionalProperties": false,
+
+  "properties": {
+    "blueprint_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Semver. Major: ontology changes requiring re-extraction. Minor: additive types. Patch: descriptions, patterns, non-semantic edits."
+    },
+    "blueprint_hash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$",
+      "description": "Content hash, computed by tooling over everything except this field. Stamped on every node and edge Forge writes, so a later blueprint change can target exactly the affected types instead of forcing a full rebuild."
+    },
+    "name": { "type": "string", "pattern": "^[a-z][a-z0-9_-]{1,63}$" },
+    "description": { "type": "string" },
+    "design_note": {
+      "type": "string",
+      "description": "Why each type exists. In six months someone will ask why two types were not merged and nobody will remember. Not optional in practice."
+    },
+
+    "structure": {
+      "type": "object",
+      "description": "How raw sources become chunks. Deterministic: no model involved.",
+      "required": ["source_types", "hierarchy", "chunk_at"],
+      "additionalProperties": false,
+      "properties": {
+        "source_types": {
+          "type": "array", "minItems": 1,
+          "items": { "enum": ["pdf", "markdown", "html", "text", "docx", "epub"] }
+        },
+        "hierarchy": {
+          "type": "array", "minItems": 1, "maxItems": 8,
+          "description": "Ordered outermost first. Each level's regex runs with MULTILINE. One capture group means the heading has no separate number and the group is the title; two means number then title.",
+          "items": {
+            "type": "object",
+            "required": ["level", "pattern"],
+            "additionalProperties": false,
+            "properties": {
+              "level": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+              "pattern": { "type": "string" },
+              "example": { "type": "string", "description": "A real line from the corpus this matched. Proves the pattern was tested, not guessed." }
+            }
+          }
+        },
+        "chunk_at": { "type": "string", "description": "Which hierarchy level becomes a Chunk. Must name a declared level." },
+        "max_chunk_chars": { "type": "integer", "minimum": 500, "maximum": 32000, "default": 4000 },
+        "subsplit_pattern": { "type": "string", "description": "Only applied above max_chunk_chars. Splitting short units cuts relations in half." },
+        "skip_regions": {
+          "type": "array",
+          "description": "Front matter, tables of contents, indexes. These match heading patterns and produce chunks you pay to extract nothing from.",
+          "items": {
+            "type": "object",
+            "required": ["match"],
+            "additionalProperties": false,
+            "properties": {
+              "match": { "type": "string" },
+              "span": { "enum": ["line", "to_next_heading", "to_end"], "default": "to_next_heading" },
+              "reason": { "type": "string" }
+            }
+          }
+        },
+        "xref_patterns": {
+          "type": "array",
+          "description": "Cross-references parsed deterministically at near-100% precision. Anything listed here must also appear in ontology.deterministic_relations so the extractor is told not to duplicate it.",
+          "items": {
+            "type": "object",
+            "required": ["name", "pattern", "relation"],
+            "additionalProperties": false,
+            "properties": {
+              "name": { "type": "string" },
+              "pattern": { "type": "string" },
+              "relation": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" },
+              "target_level": { "type": "string" },
+              "example": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+
+    "ontology": {
+      "type": "object",
+      "required": ["node_types", "relationship_types", "patterns", "closed"],
+      "additionalProperties": false,
+      "properties": {
+        "closed": {
+          "const": true,
+          "description": "Always true. An open ontology is the single most common cause of a hairball graph. Forge sets every additional_* pruning flag from this."
+        },
+        "node_types": {
+          "type": "array", "minItems": 2, "maxItems": 20,
+          "description": "6 to 12 is the working range. Past ~15 the model is choosing between near-synonymous labels and the choice becomes arbitrary. If a domain seems to need 25, most of them are properties.",
+          "items": { "$ref": "#/$defs/nodeType" }
+        },
+        "relationship_types": {
+          "type": "array", "minItems": 1, "maxItems": 30,
+          "items": { "$ref": "#/$defs/relationshipType" }
+        },
+        "patterns": {
+          "type": "array", "minItems": 1,
+          "description": "Domain/range signatures as [source, RELATION, target]. Exhaustive: a relationship with no declared pattern is unconstrained. This is the highest-leverage validation available, because a violating edge can be dropped without a human reading it.",
+          "items": {
+            "type": "array", "minItems": 3, "maxItems": 3,
+            "items": { "type": "string" }
+          }
+        },
+        "deterministic_relations": {
+          "type": "array",
+          "description": "Relations produced by structure.xref_patterns. The extractor is instructed to skip these.",
+          "items": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" }
+        },
+        "vocabularies": {
+          "type": "object",
+          "description": "Controlled lists for node types with many surface forms. Entities resolve against the list rather than pairwise against each other, because pairwise resolution drifts and anchoring does not.",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["source"],
+            "additionalProperties": false,
+            "properties": {
+              "source": { "type": "string" },
+              "tiers": {
+                "type": "array",
+                "items": { "enum": ["exact", "fuzzy", "embedding", "llm_closed"] },
+                "default": ["exact", "fuzzy", "embedding", "llm_closed"]
+              },
+              "fuzzy_threshold": { "type": "number", "minimum": 0, "maximum": 1 },
+              "embedding_threshold": { "type": "number", "minimum": 0, "maximum": 1 },
+              "seeded_from": { "type": "string", "description": "Authoritative external source, e.g. USDA FoodData Central." }
+            }
+          }
+        },
+        "resolution": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["labels", "strategy"],
+            "additionalProperties": false,
+            "properties": {
+              "labels": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+              "strategy": { "enum": ["exact", "fuzzy", "semantic", "vocabulary"] },
+              "threshold": { "type": "number", "minimum": 0, "maximum": 1 }
+            }
+          }
+        },
+        "temporal": {
+          "type": "object",
+          "description": "For corpora amended over time. Without validity intervals, superseded content answers queries and nobody notices until it matters.",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean", "default": false },
+            "labels": { "type": "array", "items": { "type": "string" } },
+            "as_of_default": { "enum": ["now", "all"], "default": "now" }
+          }
+        }
+      }
+    },
+
+    "embedding": {
+      "type": "object",
+      "required": ["model", "dimensions", "targets"],
+      "additionalProperties": false,
+      "properties": {
+        "provider": { "enum": ["local", "openai", "ollama", "cohere", "mistral", "gateway"], "default": "local" },
+        "model": { "type": "string" },
+        "dimensions": {
+          "type": "integer", "minimum": 64, "maximum": 8192,
+          "description": "Must match the model exactly. A mismatch does not raise; it makes every search return nothing."
+        },
+        "similarity": { "enum": ["cosine", "euclidean"], "default": "cosine" },
+        "targets": {
+          "type": "array", "minItems": 1,
+          "description": "What gets vectorised. Embedding raw chunk text alone loses the hierarchy: 'Article 12' is ambiguous without its path.",
+          "items": {
+            "type": "object",
+            "required": ["name", "of", "text"],
+            "additionalProperties": false,
+            "properties": {
+              "name": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+              "of": {
+                "oneOf": [
+                  { "type": "string" },
+                  { "type": "array", "items": { "type": "string" } }
+                ]
+              },
+              "text": { "type": "string", "description": "Template over node properties, e.g. '{path}\\n\\n{text}'." },
+              "facet": { "type": "string", "description": "Facet name when multi_vector is on, e.g. identity, flavor, ingredients." }
+            }
+          }
+        },
+        "multi_vector": {
+          "type": "boolean", "default": false,
+          "description": "Separate vectors per facet rather than one blended vector per node. Better on structured domains where a query targets one aspect."
+        },
+        "cache": { "enum": ["content_hash", "none"], "default": "content_hash" },
+        "hybrid": {
+          "type": "object",
+          "description": "Fulltext alongside vectors. Matters more than people expect: users type exact identifiers and short rare terms, and vector similarity is mediocre at both.",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean", "default": true },
+            "fusion": { "enum": ["rrf", "linear"], "default": "rrf" }
+          }
+        }
+      }
+    },
+
+    "workload": {
+      "type": "object",
+      "description": "The questions this graph must answer. This is what makes the ontology falsifiable: without it, 'is this a good schema?' has no answer.",
+      "required": ["shapes"],
+      "additionalProperties": false,
+      "properties": {
+        "shapes": {
+          "type": "array", "minItems": 2,
+          "items": {
+            "type": "object",
+            "required": ["id", "example", "kind"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+              "kind": {
+                "enum": ["lookup", "multi_hop", "aggregation", "negative", "safety", "comparison", "temporal"],
+                "description": "lookup should match or lose to plain vector RAG; multi_hop is where the graph must win. Include at least one of each so the comparison is honest."
+              },
+              "example": { "type": "string" },
+              "hops": { "type": "integer", "minimum": 0, "maximum": 4 },
+              "must_traverse": { "type": "array", "items": { "type": "string" } },
+              "must_return": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        },
+        "golden_set": { "type": "string", "description": "Path to a JSONL of labelled questions. 30 to 50 is enough to steer decisions." },
+        "baseline": {
+          "type": "boolean", "default": true,
+          "description": "Measure plain vector RAG on the same corpus. GraphRAG costs more to build and run; if it does not beat the baseline on the declared shapes, the schema is wrong and more graph will not fix it."
+        }
+      }
+    },
+
+    "guardrails": {
+      "type": "object",
+      "description": "What must never leak. Decided at design time, compiled into Cypher at query time. A prompt-level constraint can be talked around; a WHERE clause cannot.",
+      "additionalProperties": false,
+      "properties": {
+        "hard_filters": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "mode"],
+            "additionalProperties": false,
+            "properties": {
+              "name": { "type": "string" },
+              "mode": { "enum": ["exclude", "restrict", "force_include"] },
+              "cypher": { "type": "string" },
+              "labels": { "type": "array", "items": { "type": "string" } },
+              "params": { "type": "array", "items": { "type": "string" } },
+              "rationale": { "type": "string" }
+            }
+          }
+        },
+        "conflict_policy": {
+          "enum": ["surface_both", "prefer_strictest", "prefer_newest", "prefer_source_rank"],
+          "default": "surface_both",
+          "description": "Sources will disagree. surface_both with attribution is the safe default; a safety corpus may want the stricter rule to win. This is a domain decision and belongs here, not in Serve."
+        },
+        "answer_policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "require_citation": { "type": "boolean", "default": true },
+            "refuse_outside_corpus": {
+              "type": "boolean", "default": true,
+              "description": "Say 'not in the corpus' rather than falling back to general knowledge. For a corpus someone deliberately built a graph from, that fallback defeats the point."
+            }
+          }
+        },
+        "release_blockers": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Named eval suites that must pass before any release. Safety filters belong here."
+        }
+      }
+    },
+
+    "drift": {
+      "type": "object",
+      "description": "Thresholds that turn ontology maintenance from a vague worry into a triggered task with evidence attached.",
+      "additionalProperties": false,
+      "properties": {
+        "max_unmapped_mention_rate": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.15 },
+        "max_vocabulary_miss_rate": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.10 },
+        "max_degree": { "type": "integer", "minimum": 10, "default": 300 },
+        "max_degree_exempt": { "type": "array", "items": { "type": "string" } },
+        "min_provenance_coverage": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.85 }
+      }
+    },
+
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "require_quote": { "type": "boolean", "default": true },
+        "require_page": { "type": "boolean", "default": false, "description": "Set for paginated sources where 'where does it say that' is a legitimate question." },
+        "quote_max_chars": { "type": "integer", "default": 300 }
+      }
+    }
+  },
+
+  "$defs": {
+    "property": {
+      "type": "object",
+      "required": ["name", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+        "type": { "enum": ["STRING", "INTEGER", "FLOAT", "BOOLEAN", "DATE", "LOCAL_DATETIME", "LIST"] },
+        "required": { "type": "boolean", "default": false },
+        "description": { "type": "string" },
+        "enum": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "nodeType": {
+      "type": "object",
+      "required": ["label", "description"],
+      "additionalProperties": false,
+      "properties": {
+        "label": { "type": "string", "pattern": "^[A-Z][A-Za-z0-9]*$" },
+        "description": {
+          "type": "string", "minLength": 10,
+          "description": "Sent to the extractor on every chunk, so keep it tight once the profile is proven. Verbose descriptions are correct for the first run and wasteful afterwards."
+        },
+        "answers": {
+          "type": "string",
+          "description": "The user question this type exists to answer. A type that cannot name one is a property, not a node."
+        },
+        "properties": { "type": "array", "items": { "$ref": "#/$defs/property" } }
+      }
+    },
+    "relationshipType": {
+      "type": "object",
+      "required": ["label", "description"],
+      "additionalProperties": false,
+      "properties": {
+        "label": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" },
+        "description": { "type": "string", "minLength": 10 },
+        "properties": { "type": "array", "items": { "$ref": "#/$defs/property" } }
+      }
+    }
+  }
+}

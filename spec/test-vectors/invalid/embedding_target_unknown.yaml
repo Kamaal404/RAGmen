@@ -1,0 +1,6 @@
+blueprint_version: 1.0.0
+name: sample
+structure: {}
+ontology: {node_types: [{label: Known}], relationship_types: [], patterns: [], closed: true}
+embedding: {model: test, dimensions: 128, targets: [{of: Unknown}]}
+workload: {}
