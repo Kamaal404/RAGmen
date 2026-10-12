@@ -20,3 +20,6 @@ blueprints/*.local.yaml
 *.egg-info/
 *.db
 forge-dry-run/
+
+# MkDocs build output
+site/

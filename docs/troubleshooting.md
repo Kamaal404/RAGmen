@@ -1,206 +1,163 @@
 # Troubleshooting
 
-Common errors and how to fix them.
+---
+
+## Installation
+
+??? failure "`forge: command not found`"
+
+    The forge package was not installed, or the wrong Python environment is active.
+
+    ```bash
+    cd forge && pip install -e ".[dev]"
+    ```
+
+    Verify: `forge --help`
+
+??? failure "`ModuleNotFoundError: No module named 'forge'`"
+
+    Same root cause. If using a virtual environment (`venv`, `conda`), make sure it is activated before installing and running.
+
+??? failure "`pip: command not found`"
+
+    Try: `python -m pip install -e ".[dev]"`
 
 ---
 
-## Installation problems
+## Database
 
-### `forge: command not found`
+??? failure "`Connection refused: bolt://localhost:7687`"
 
-The forge package was not installed, or it was installed in a different Python environment.
+    Neo4j is not running.
 
-**Fix:**
-```
-cd forge && pip install -e ".[dev]"
-```
+    ```bash
+    docker compose up -d
+    ```
 
-Then verify with `forge --help`.
+    Wait ~10 seconds, then retry. Verify Docker is open and running:
 
----
+    ```bash
+    docker ps
+    ```
 
-### `ModuleNotFoundError: No module named 'forge'`
+??? failure "`Authentication failure` on Neo4j"
 
-Same as above — the package is not installed in the current environment.
+    The credentials in `.env` do not match what Neo4j was initialized with.
 
-If you are using a virtual environment (`venv`, `conda`, etc.), make sure it is activated before installing and before running commands.
+    Check your `.env`:
 
----
+    ```
+    NEO4J_USER=neo4j
+    NEO4J_PASSWORD=password
+    ```
 
-### `pip: command not found`
+    These must match the values in `docker-compose.yml`. If you changed the password in the Neo4j browser, update `.env` to match.
 
-Python is installed but `pip` is not on your PATH.
+??? failure "Database is empty after `forge cook`"
 
-Try:
-```
-python -m pip install -e ".[dev]"
-```
+    Three possible causes:
 
----
+    1. **`forge cook` used `--store memory`** — in-memory data disappears when the command exits. Run again with `--store neo4j`.
 
-## Database problems
+    2. **Indexes not created** — run `make reset` to wipe and restart the database, then run `forge cook` again.
 
-### `neo4j driver not installed`
-
-You tried to use `--store neo4j` without the Neo4j Python driver.
-
-**Fix:**
-```
-pip install neo4j
-```
+    3. **Run was interrupted** — run `forge cook src-abc123` again, it will resume from the last completed chunk.
 
 ---
 
-### `Connection refused: bolt://localhost:7687`
+## Blueprint
 
-The Neo4j container is not running.
+??? failure "`blueprint is invalid: pattern source unknown`"
 
-**Fix:**
-```
-docker compose up -d
-```
+    A pattern references a node type not declared in `node_types`.
 
-Wait about 10 seconds for Neo4j to start, then try again.
+    Example:
+    ```
+    pattern [Ingredient, USED_IN, Recipe] — source label 'Ingredient' not in node_types
+    ```
 
-If it still fails, check whether Docker is running:
-```
-docker ps
-```
+    Fix: either add `Ingredient` to `node_types`, or correct the pattern.
 
----
+??? failure "`blueprint is invalid: invalid regex`"
 
-### `Authentication failure` on Neo4j
+    A `hierarchy` or `skip_regions` pattern is not valid Python regex.
 
-The username or password in your `.env` file does not match what Neo4j was set up with.
+    Test your regex at [regex101.com](https://regex101.com) (Python flavor). In YAML, backslashes need escaping: use `\\d+` not `\d+`.
 
-**Fix:** Check your `.env` file:
-```
-NEO4J_USER=neo4j
-NEO4J_PASSWORD=password
-```
+??? failure "`blueprint not approved`"
 
-Make sure these match the values in `docker-compose.yml`. If you changed the password in the Neo4j browser, update `.env` to match.
+    You tried to run `forge add` with an unapproved blueprint.
 
----
+    Fix: once satisfied with the blueprint, add:
 
-### Database is empty after `forge cook`
-
-A few possible causes:
-
-1. **`forge cook` ran with `--store memory`** — in-memory data disappears when the command exits. Run again with `--store neo4j`.
-
-2. **Neo4j indexes were not created** — this can cause silent failures. Run `make reset` to wipe and restart the database, then run `forge cook` again.
-
-3. **`forge cook` was interrupted** — run it again, it will resume from the last completed chunk.
+    ```yaml
+    approved: true
+    approved_by: your-name
+    approved_at: "2026-10-12"
+    ```
 
 ---
 
-## Blueprint problems
+## Extraction
 
-### `blueprint is invalid: pattern source unknown`
+??? failure "`openai API key not set`"
 
-A pattern in your blueprint references a node type that is not declared in `node_types`.
+    Add your key to `.env`:
 
-**Example error:**
-```
-pattern [Ingredient, USED_IN, Recipe] — source label 'Ingredient' not in node_types
-```
+    ```
+    OPENAI_API_KEY=sk-...
+    ```
 
-**Fix:** Either add `Ingredient` to your `node_types` list, or correct the pattern to use an existing node type.
+    For testing without an API key:
 
----
+    ```bash
+    forge extract src-abc123 --provider mock
+    ```
 
-### `blueprint is invalid: invalid regex`
+??? question "Extraction is very slow"
 
-A pattern in `hierarchy` or `skip_regions` is not a valid regular expression.
+    Normal rate: 1–3 chunks per second. A 300-page book (~150 chunks) takes 2–5 minutes.
 
-**Fix:** Test your regex at [regex101.com](https://regex101.com) before putting it in the blueprint. Remember to escape backslashes in YAML (use `\\d+` not `\d+`).
+    If stuck for >20 minutes:
+    - Check your API key has not hit a rate limit or quota
+    - Press `Ctrl+C` to stop, then run `forge cook` again — it resumes from where it left off
 
----
+??? question "Graph has hub nodes with hundreds of edges"
 
-### `blueprint not approved`
+    This almost always means the schema is too open or entity resolution is not running.
 
-You tried to run `forge add` with a blueprint that has `approved: false` or no approval block.
+    Checklist:
 
-**Fix:** Once you are satisfied with the blueprint, add:
-```yaml
-approved: true
-approved_by: your-name
-approved_at: "2026-10-12"
-```
-
----
-
-## Extraction problems
-
-### `openai API key not set`
-
-You ran `forge cook` or `forge extract` without an API key.
-
-**Fix:** Add your key to `.env`:
-```
-OPENAI_API_KEY=sk-...
-```
-
-Or use the mock provider for testing (no API key needed):
-```
-forge extract src-abc123 --provider mock
-```
+    - [ ] Blueprint has `closed: true` in the ontology section
+    - [ ] All patterns are specific `[SourceType, REL, TargetType]` triples
+    - [ ] Run `forge conflicts` to see which entities have the most disagreements
 
 ---
 
-### Extraction is very slow
+## Serving and answers
 
-Normal extraction rate is roughly 1-3 chunks per second depending on chunk size and API latency. A 300-page book with 150 chunks takes 2-5 minutes.
+??? failure "`lattice-serve` starts but `agent ask` returns no results"
 
-If it has been running for more than 20 minutes with no progress, check:
-- Your API key has not hit its rate limit or quota
-- The terminal is not frozen (press Enter to see if it responds)
+    Check that both are using the same store:
+    - `forge cook --store neo4j` writes to Neo4j → start serve with `--store neo4j`
+    - `forge cook --store memory` data is gone when the command exited → re-cook with `--store neo4j`
 
-If a run is truly stuck, press `Ctrl+C` to stop it. Run `forge cook` again — it resumes from the last completed chunk automatically.
+??? question "`agent ask` refuses to answer"
 
----
+    This is intentional. `refuse_outside_corpus: true` in your blueprint means the agent says "I cannot find that in the documents" rather than guessing from general knowledge.
 
-### Graph has too many entities / hub nodes
+    If the answer *should* be there:
 
-This usually means the schema is too open or entity resolution is not working.
-
-Signs of the problem:
-- One entity has hundreds of relationships
-- Entity names are all variations of the same thing ("fire", "the fire", "a fire")
-- `forge conflicts` shows thousands of conflicts
-
-**Fixes:**
-1. Make sure your blueprint has `closed: true` in the ontology section
-2. Check that `patterns` is restrictive — every allowed `[source, REL, target]` combination should make sense
-3. Run `forge conflicts` to see which entities have the most disagreements
+    1. Check the source was extracted: `forge status src-abc123`
+    2. Re-run extraction: `forge cook src-abc123`
+    3. Rephrase using terms from the document
 
 ---
 
-## Serving problems
-
-### `lattice-serve` starts but `agent ask` gets no results
-
-Make sure both commands are using the same store:
-- If `lattice-serve --store memory` is running, the data lives in that process only
-- If you ran `forge cook --store neo4j`, start serve with `--store neo4j`
-
----
-
-### `agent ask` refuses to answer
-
-This is intentional behavior, not an error. The agent is configured with `refuse_outside_corpus: true` in the blueprint's `guardrails` section. If the answer cannot be found in the documents, it says so.
-
-If you believe the answer *should* be in the documents, check:
-1. Was the source extracted? Run `forge status src-abc123` to check
-2. Did extraction find anything? Run `forge cook src-abc123` again and check the entity count in the output
-3. Is the question using the right vocabulary? Try rephrasing using terms from the document
-
----
-
-## Getting more help
+## Getting help
 
 Open an issue at [github.com/Kamaal404/RAGmen/issues](https://github.com/Kamaal404/RAGmen/issues) with:
-- What command you ran
-- What output you got
-- What you expected instead
+
+- The exact command you ran
+- The full output / error message
+- What you expected to happen
