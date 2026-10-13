@@ -8,13 +8,14 @@ TOPK      ?= 5
 
 set_env = set -a; [ -f .env ] && source .env; set +a;
 
-.PHONY: help setup up down shell reset test validate forge-install serve-install agent-install
+.PHONY: help setup up down shell reset test validate eval forge-install serve-install agent-install
 
 help:
 	@echo "RAGmen"
 	@echo ""
 	@echo "  make test                          offline test suite (no LLM, no DB)"
 	@echo "  make validate BLUEPRINT=<path>     validate a blueprint YAML"
+	@echo "  make eval                         recall@k: hybrid vs vector on a golden set"
 	@echo ""
 	@echo "  forge add INPUT=<path> BLUEPRINT=<path>   register + chunk a source"
 	@echo "  forge cook <source_id>                    resolve → embed → write"
@@ -34,6 +35,14 @@ test:
 
 validate:
 	python blueprint/scripts/validate_blueprint.py $(BLUEPRINT)
+
+# Offline by default: mock extractor and embedder. Override EVAL_FLAGS with
+# --embed-backend local (and --provider openai, which costs money) for real numbers.
+EVAL_BLUEPRINT ?= spec/examples/tenancy.blueprint.yaml
+EVAL_SOURCE    ?= spec/examples/corpora/tenancy-act.md
+EVAL_FLAGS     ?=
+eval:
+	python eval/run_eval.py --blueprint $(EVAL_BLUEPRINT) --source $(EVAL_SOURCE) --top-k $(TOPK) $(EVAL_FLAGS)
 
 forge-install:
 	cd forge && pip install -e ".[dev]"

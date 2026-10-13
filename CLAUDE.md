@@ -46,7 +46,7 @@ blueprint/scripts/validate_blueprint.py  Spec + semantic + Forge-contract valida
 blueprint/commands/                      /bp-new, /bp-revise
 tests/test_blueprint.sh                  Validator mutation suite
 vocab/                                   Vocabulary CSVs (canonical,aliases)
-eval/                                    Golden sets
+eval/                                    Golden sets; run_eval.py scores retrieval against them
 forge/                                   Build-time package
 serve/                                   MCP retrieval server
 agent/                                   Answer policy layer
@@ -66,6 +66,10 @@ python blueprint/scripts/inspect_corpus.py --input <corpus> --show-sample
 
 # Run all tests (offline, no API key, no DB)
 make test
+
+# Retrieval eval: recall@k, hybrid vs vector baseline (offline by default)
+make eval
+python eval/run_eval.py --blueprint <bp> --source <file>... --embed-backend local -v
 
 # Forge CLI
 forge add <file> --blueprint spec/examples/firecraft.blueprint.yaml
@@ -156,10 +160,26 @@ The validator warns on each; `blueprint/references/forge_contract.md` has detail
 - No `docx` or `epub` loader.
 - Chunk paths drop the heading number (`Deposits / Maximum deposit`, not `Article 3`).
 
+## Phase 7: evaluation harness (code done, tests pending)
+
+`eval/run_eval.py` builds the graph in memory through the real Forge pipeline,
+then scores every golden item through Serve's hybrid retriever and through
+vector similarity alone. Offline mode (mock extractor and embedder) proves the
+plumbing only; mock vectors are hashes. Still to do: end-to-end tests of the
+harness, a CI step with a `--min-recall` floor, and golden sets of 30 to 50
+real questions. The incremental update/retract/drift work `ARCHITECTURE.md`
+calls phase 7 is already built (`forge/tests/test_phase7.py`).
+
+Serve limits the harness works around, not fixes:
+- The hybrid retriever's sub-retrievers read MemoryStore dicts, so retrieval
+  against Neo4j is not implemented, and `lattice-serve --store memory` serves
+  an empty store. The harness builds and queries in one process for this reason.
+- Query embedding defaults to a hash mock; the harness passes the Forge
+  embedder via `HybridRetriever(store, embed_query=...)`. `lattice-serve` does not yet.
+- Guardrail filters are not applied during eval.
+
 ## Deliberately not done yet
 
-- Phase 7: Evaluation harness in CI (golden set + recall@k). `ARCHITECTURE.md`
-  names phase 7 as incremental update/retract/drift; reconcile the two plans first.
 - Global search via community detection (only worth it for genuinely global queries)
 - Deployment manifests (Docker Compose for forge + serve stack)
 

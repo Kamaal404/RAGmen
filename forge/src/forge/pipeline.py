@@ -87,6 +87,7 @@ def run_pipeline(
     embed_kwargs: dict[str, Any] | None = None,
     hub_threshold: int = 50,
     dry_run: bool = False,
+    store: GraphStore | None = None,
 ) -> PipelineResult:
     """Run the full resolve -> embed -> write -> validate pipeline.
 
@@ -101,6 +102,9 @@ def run_pipeline(
         embed_kwargs: Passed to embed_for().
         hub_threshold: Degree threshold for hub detection.
         dry_run: If True, skip writing to store.
+        store: An open store to write into instead of opening one. The caller
+            owns it and it is left open, so an in-process consumer (the eval
+            harness) can query a MemoryStore after the build; close() clears it.
 
     Returns:
         PipelineResult with all metrics.
@@ -110,11 +114,13 @@ def run_pipeline(
     embed_kwargs = _embed_kwargs(blueprint, embed_backend, embed_kwargs)
 
     # --- 1. Open store ---
-    try:
-        store: GraphStore = store_for(store_backend, **store_kwargs)
-    except Exception as e:
-        result.errors.append(f"Failed to open store: {e}")
-        return result
+    owns_store = store is None
+    if store is None:
+        try:
+            store = store_for(store_backend, **store_kwargs)
+        except Exception as e:
+            result.errors.append(f"Failed to open store: {e}")
+            return result
 
     try:
         # --- 2. Enforce the closed ontology, then resolve ---
@@ -237,7 +243,8 @@ def run_pipeline(
             result.errors.append(f"Failed to build drift report: {e}")
 
     finally:
-        store.close()
+        if owns_store:
+            store.close()
 
     # --- 6b. Drift threshold enforcement ---
     if result.drift_report and result.drift_report.thresholds_exceeded:

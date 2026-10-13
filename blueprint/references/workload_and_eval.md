@@ -43,9 +43,19 @@ never tested.
 
 ```json
 {"id": "mh-004", "shape": "multi_hop", "q": "what do I burn for a cooking fire in wet conditions",
- "gold_chunks": ["c_8fa21b"], "gold_nodes": ["FireLay:log cabin"],
+ "gold_paths": ["TINDER AND KINDLING / WET WEATHER FIRES"], "gold_nodes": ["Material:birch bark"],
  "must_include": ["dry inner bark"], "must_not_include": []}
 ```
+
+`gold_paths` are chunk breadcrumbs exactly as `forge chunks` prints them. Prefer
+them to `gold_chunks` (chunk id prefixes): ids include the source id, so they
+change on every fresh build. `gold_nodes` are `Label:name` and score against the
+chunks that mention that entity; a node the build never produced is reported as
+`not_in_graph`, which is an extraction miss, not a retrieval miss.
+
+Score it with `eval/run_eval.py` (or `make eval`), which builds the graph in
+memory and reports recall@k, hit@k and MRR per shape, for the hybrid retriever
+and the plain vector baseline side by side.
 
 `must_not_include` is the field people leave empty and should not. For a safety
 or exclusion question, what must *not* appear is the actual test.

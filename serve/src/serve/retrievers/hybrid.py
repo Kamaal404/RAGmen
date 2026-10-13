@@ -13,6 +13,7 @@ they run as Cypher queries on the database.
 from __future__ import annotations
 
 import math
+from collections.abc import Callable
 from typing import Any
 
 from .base import Retriever, SearchHit, SearchResult
@@ -224,8 +225,16 @@ class HybridRetriever(Retriever):
 
     name = "hybrid"
 
-    def __init__(self, store: Any) -> None:
+    def __init__(
+        self,
+        store: Any,
+        embed_query: Callable[[str], list[float]] | None = None,
+    ) -> None:
         self.store = store
+        # The query must be embedded by the same model that embedded the
+        # chunks, or cosine similarity compares unrelated spaces. Without one
+        # this falls back to the hash mock, which only matches MockEmbedder.
+        self._embed_query = embed_query
         # Always try to build memory-mode sub-retrievers; they degrade
         # gracefully if embeddings or entity index are missing.
         self._vector = _MemoryVectorRetriever(store)
@@ -239,6 +248,9 @@ class HybridRetriever(Retriever):
         For now, produce a deterministic mock embedding so the
         vector retriever works without sentence-transformers.
         """
+        if self._embed_query is not None:
+            return self._embed_query(query)
+
         import hashlib
 
         seed = hashlib.sha256(query.encode("utf-8")).digest()
@@ -286,6 +298,16 @@ class HybridRetriever(Retriever):
             total_hits=len(final),
             retriever=self.name,
         )
+
+    def retrieve_vector(
+        self,
+        embedding: list[float],
+        top_k: int = 10,
+        filters: dict[str, Any] | None = None,  # noqa: ARG002
+    ) -> SearchResult:
+        """Vector similarity alone: the plain-RAG baseline the graph must beat."""
+        hits = self._vector.retrieve(embedding, top_k=top_k)
+        return SearchResult(query="", hits=hits, total_hits=len(hits), retriever="vector")
 
     def expand(
         self,
