@@ -23,14 +23,19 @@ The validator warns when a Chunk target omits `{path}`.
 Chunk vectors answer "where is this discussed". Entity vectors answer "what is
 this thing", which is a different question and often the one users ask.
 
-An entity card is a short synthetic text built from the node and its
-neighbourhood:
+An entity card is a short synthetic text built from the node. Forge currently
+supplies only `{name}` and `{label}` to entity templates (see
+`forge_contract.md`), so a card is:
 
 ```yaml
   - name: entity_card
     of: [Procedure, Technique]
-    text: "{name}. {description}. Used for: {purposes}. Avoid when: {avoid_when}"
+    text: "{label}: {name}"
 ```
+
+Richer cards that pull in properties or neighbours (`Used for: {purposes}`) are
+the goal, but they need Forge to supply those fields first. The validator
+rejects any other field, because it would crash the embedding step.
 
 Build cards for the types users name directly. Skip them for types that only
 ever appear as attributes of something else.

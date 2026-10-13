@@ -10,7 +10,7 @@ It is split into three components **by cadence**, not by function:
 | Component | Runs | Nature | Status |
 |---|---|---|---|
 | **Blueprint** | Once per corpus type | Judgment, human-gated | done |
-| **Forge** | Once per source, repeatedly | Machinery, unattended | phases 1-5 done |
+| **Forge** | Once per source, repeatedly | Machinery, unattended | phases 1-6 done |
 | **Serve** | Per question | Read-only retrieval, MCP | done |
 | **Agent** | Per question | Answer policy layer | done |
 
@@ -35,14 +35,19 @@ to write `if corpus == "legal"`, the spec needs a new field instead.
 
 ```
 spec/blueprint.schema.json               THE contract. Both sides validate against it.
-spec/examples/firecraft.blueprint.yaml   Reference blueprint, validates clean.
+spec/examples/firecraft.blueprint.yaml   Reference blueprint: PDF books, every spec section.
+spec/examples/tenancy.blueprint.yaml     Second reference: markdown statute. Proves onboarding.
+spec/examples/corpora/                   Sample corpus for the tenancy blueprint
 blueprint/SKILL.md                       Design-time skill (Claude Code / opencode)
-blueprint/references/                    ontology, workload+eval, embedding, guardrails
+blueprint/references/                    ontology, workload+eval, embedding, guardrails,
+                                         forge_contract (what Forge actually executes)
 blueprint/scripts/inspect_corpus.py      Structure discovery. No LLM, no network.
-blueprint/scripts/validate_blueprint.py  Spec + semantic validation, content hashing
+blueprint/scripts/validate_blueprint.py  Spec + semantic + Forge-contract validation, hashing
 blueprint/commands/                      /bp-new, /bp-revise
-eval/firecraft.jsonl                     Golden set example
-forge/                                   Build-time package (phases 1-5)
+tests/test_blueprint.sh                  Validator mutation suite
+vocab/                                   Vocabulary CSVs (canonical,aliases)
+eval/                                    Golden sets
+forge/                                   Build-time package
 serve/                                   MCP retrieval server
 agent/                                   Answer policy layer
 ```
@@ -92,6 +97,12 @@ there is no excuse for skipping them.
 - New validation rule means a new mutation case in `tests/test_blueprint.sh`. The
   suite tests that the validator **rejects** bad input; a validator only ever
   tested on good input has not been tested.
+- Add checks to `CHECKS` in `validate_blueprint.py`. Forge calls `run_checks`, so
+  that one edit enforces it on both sides.
+- When Forge gains a capability the spec already declares (a loader, a template
+  field, a resolution tier), relax the matching rule in the validator's "forge
+  contract" section and update `blueprint/references/forge_contract.md` in the
+  same change.
 
 ## Bugs already found and fixed, do not reintroduce
 
@@ -112,27 +123,43 @@ These came out of testing and are easy to write again:
    any joining, or already-joined lines inflate it and block the rest.
 6. **Low-confidence hierarchy levels must be re-sorted by rank** after merging.
    Hierarchy is outermost-first; appending at the end produces an invalid order.
+7. **Blueprint thresholds are 0-1, rapidfuzz scores are 0-100.** Compared
+   unscaled, `fuzzy_threshold: 0.9` matched almost anything and collapsed a
+   whole type into its nearest vocabulary entry.
+8. **Test Forge against real blueprint files, not hand-built dicts.** Dicts skip
+   the spec, which is how the reference blueprint's embedding templates came to
+   crash `cook` while every test passed. `forge/tests/test_phase6.py` loads
+   every `spec/examples/*.blueprint.yaml`; a new example is covered by adding it.
 
 ## Current state
 
-Phases 1-5 are complete and tested:
+Phases 1-6 are complete and tested:
 
 - **Phase 1**: source registry, loaders (PDF, text, markdown), chunking, CLI (`forge add/list/status/retract/chunks`)
 - **Phase 2**: extraction with prompt caching, dry-run, cost reporting (`forge extract`)
 - **Phase 3**: entity resolution (tiered: exact → fuzzy → embedding → LLM), embedding with hash cache, graph storage (MemoryStore + Neo4j), pipeline orchestration, drift reporting
 - **Phase 4**: Serve MCP server with hybrid retrieval (vector + keyword + graph, RRF fusion), guardrail compiler
 - **Phase 5**: Agent answer policy with enforced citations, conflict surfacing, corpus-only answers
+- **Phase 6**: Blueprint skill rebuilt against Forge. Validator enforces the Forge
+  contract; Forge enforces the closed ontology, reads vocabulary CSVs, and takes
+  embedding model and dimensions from the blueprint. The tenancy example
+  onboards end to end with no Forge changes.
 
-## Next task: Phase 6 — Blueprint skill rebuild
+## Known Forge gaps (declared in the spec, not executed)
 
-Rebuild the design-time blueprint skill now that Forge exists to consume its output.
-The skill must emit spec-valid blueprints that `forge add` can use directly.
-See `blueprint/SKILL.md` for the current design.
+The validator warns on each; `blueprint/references/forge_contract.md` has detail.
+
+- `structure.xref_patterns` are not parsed, so deterministic relations are never written.
+- Resolution tiers `embedding` and `llm_closed` are stubs; only exact and fuzzy run.
+- Entity embedding templates get only `{name}` and `{label}`: resolved entities
+  do not carry properties through.
+- No `docx` or `epub` loader.
+- Chunk paths drop the heading number (`Deposits / Maximum deposit`, not `Article 3`).
 
 ## Deliberately not done yet
 
-- Phase 6: Blueprint skill rebuild (next)
-- Phase 7: Evaluation harness in CI (golden set + recall@k)
+- Phase 7: Evaluation harness in CI (golden set + recall@k). `ARCHITECTURE.md`
+  names phase 7 as incremental update/retract/drift; reconcile the two plans first.
 - Global search via community detection (only worth it for genuinely global queries)
 - Deployment manifests (Docker Compose for forge + serve stack)
 

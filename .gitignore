@@ -23,3 +23,6 @@ forge-dry-run/
 
 # MkDocs build output
 site/
+
+# Blueprint skill scratch registry (SKILL.md step 8)
+.blueprint-check/

@@ -46,12 +46,14 @@ python blueprint/scripts/validate_blueprint.py spec/examples/firecraft.blueprint
 Expected output:
 
 ```
-✓ blueprint is valid
-  name: firecraft
-  version: 1.0.0
-  node types: 4 (Procedure, Material, Technique, Hazard)
-  patterns: 5
+warn   golden_set has 10 items; 30 to 50 is the useful range
+warn   ontology.vocabularies[Material]: Forge does not implement tiers ['embedding', 'llm_closed'] yet. Mentions that miss exact and fuzzy become new entities instead of anchoring to the vocabulary.
+warn   structure.xref_patterns: Forge does not parse cross-references yet. Deterministic relations will be declared and excluded from extraction but never written, so shapes that traverse them will come back empty.
+
+0 error(s), 3 warning(s)
 ```
+
+`0 error(s)` is what matters. Each warning names something the blueprint declares that will do less than it says; the firecraft ones are known and accepted.
 
 !!! tip
 

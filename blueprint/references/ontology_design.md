@@ -82,6 +82,8 @@ before ingesting anything.
 Four tiers, first hit wins: exact, fuzzy, embedding, then an LLM fallback
 **constrained to a shortlist**. Tier 4 must be closed-list; an open-ended "what
 is this?" call reintroduces exactly the variance the vocabulary exists to remove.
+Forge builds only the first two today, so load known surface forms into the
+CSV's `aliases` column (format in `forge_contract.md`).
 
 Entities resolve against the list, never pairwise against each other. Pairwise
 resolution drifts as the corpus grows; anchoring to a fixed list does not.
