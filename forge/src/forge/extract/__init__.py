@@ -88,6 +88,9 @@ def run_extraction(
     provenance = blueprint.get("provenance", {})
     ontology_block = build_ontology_block(ontology)
 
+    node_types = ontology.get("node_types", [])
+    if provider == "mock" and node_types:
+        provider_kwargs.setdefault("label", node_types[0]["label"])
     extractor = extractor_for(provider, **provider_kwargs)
 
     results: list[ExtractionResult] = []

@@ -75,8 +75,11 @@ class MockExtractor(Extractor):
 
     model = "mock"
 
-    def __init__(self, always_empty: bool = False) -> None:
+    def __init__(self, always_empty: bool = False, label: str = "Topic") -> None:
         self.always_empty = always_empty
+        # run_extraction passes the blueprint's first node type, so mock output
+        # survives closed-ontology enforcement on any corpus.
+        self.label = label
 
     def extract(
         self,
@@ -95,7 +98,7 @@ class MockExtractor(Extractor):
             source_id=source_id,
             entities=[
                 ExtractedEntity(
-                    label="Topic",
+                    label=self.label,
                     name=chunk_path or "Untitled",
                     quote=chunk_text[:80],
                     char_start=0,

@@ -120,10 +120,11 @@ class LocalEmbedder(Embedder):
         self,
         model_name: str = "all-MiniLM-L6-v2",
         cache_dir: str | Path | None = None,
+        dimensions: int = 384,
     ) -> None:
         self.model_name = model_name
         self.model = model_name
-        self.dimensions = 384  # all-MiniLM-L6-v2
+        self.dimensions = dimensions
         self._model: Any = None
         self._cache: dict[str, list[float]] = {}
         self._cache_dir: Path | None = Path(cache_dir) if cache_dir else None
@@ -167,6 +168,15 @@ class LocalEmbedder(Embedder):
     def _content_key(self, text: str) -> str:
         return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
+    def _check_dims(self, vec: list[float]) -> None:
+        # A wrong-width vector writes fine and then matches nothing at query
+        # time. Fail here, where the cause is still obvious.
+        if len(vec) != self.dimensions:
+            raise ValueError(
+                f"{self.model_name} produced {len(vec)}-d vectors but the "
+                f"blueprint declares dimensions: {self.dimensions}"
+            )
+
     def embed(self, text: str, key: str | None = None) -> list[float]:
         cache_key = key or self._content_key(text)
         if cache_key in self._cache:
@@ -174,6 +184,7 @@ class LocalEmbedder(Embedder):
 
         self._load_model()
         vec = self._model.encode(text, normalize_embeddings=True).tolist()
+        self._check_dims(vec)
         self._cache[cache_key] = vec
         self._dirty = True
         self._persist()
@@ -203,6 +214,7 @@ class LocalEmbedder(Embedder):
                 uncached_texts, normalize_embeddings=True
             ).tolist()
             for idx, vec in zip(uncached_indices, embeddings):
+                self._check_dims(vec)
                 text = texts[idx]
                 cache_key = (
                     (keys[idx] if keys else None) or self._content_key(text)
@@ -284,9 +296,13 @@ def build_embedding_targets(
             for re_entity in resolved_entities:
                 if entity_types and re_entity.label not in entity_types:
                     continue
-                # Build a formatting dict from the entity
+                # Resolved entities carry only name and label, so those are
+                # the only fields an entity template may use. The validator
+                # rejects any other field, because format() raises on it and
+                # takes the whole embedding step down with it.
                 fmt: dict[str, str] = {
                     "name": re_entity.canonical_name,
+                    "label": re_entity.label,
                 }
                 rendered = template.format(**fmt)
                 ekey = f"entity:{re_entity.entity_id}"

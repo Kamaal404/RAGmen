@@ -4,6 +4,7 @@
 Phase 3 end-to-end flow::
 
     extraction results
+        -> enforce (drop labels and patterns the blueprint does not declare)
         -> resolve (deduplicate against vocab)
         -> embed (generate vectors for chunks + entity cards)
         -> write to store (entities, relations, chunks, embeddings)
@@ -17,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from forge.embed import Embedder, MockEmbedder, build_embedding_targets, embed_for
+from forge.enforce import enforce_ontology
 from forge.extract.cost import CostReport
 from forge.extract.models import ExtractionResult
 from forge.registry.models import Chunk, Source
@@ -36,12 +38,31 @@ class PipelineResult:
     entities_written: int = 0
     relations_written: int = 0
     chunks_written: int = 0
+    entities_dropped: int = 0
+    relations_dropped: int = 0
     errors: list[str] = field(default_factory=list)
     summary: dict[str, Any] = field(default_factory=dict)
 
     @property
     def success(self) -> bool:
         return len(self.errors) == 0
+
+
+def _embed_kwargs(blueprint: dict, backend: str, given: dict[str, Any] | None) -> dict[str, Any]:
+    """Embedder settings from the blueprint, overridden by anything passed in.
+
+    The blueprint's model and dimensions are what the vector index is built
+    for. An embedder that ignores them still produces vectors, just ones every
+    search silently misses.
+    """
+    em = blueprint.get("embedding", {})
+    kwargs: dict[str, Any] = {}
+    if em.get("dimensions"):
+        kwargs["dimensions"] = em["dimensions"]
+    if backend == "local" and em.get("model"):
+        kwargs["model_name"] = em["model"]
+    kwargs.update(given or {})
+    return kwargs
 
 
 def _existing_entity_ids(store: GraphStore) -> set[str]:
@@ -86,7 +107,7 @@ def run_pipeline(
     """
     result = PipelineResult(source_id=source.source_id)
     store_kwargs = store_kwargs or {}
-    embed_kwargs = embed_kwargs or {}
+    embed_kwargs = _embed_kwargs(blueprint, embed_backend, embed_kwargs)
 
     # --- 1. Open store ---
     try:
@@ -96,9 +117,14 @@ def run_pipeline(
         return result
 
     try:
-        # --- 2. Resolve entities ---
+        # --- 2. Enforce the closed ontology, then resolve ---
+        enforced = enforce_ontology(extraction_results, blueprint.get("ontology", {}))
+        result.entities_dropped = enforced.entities_dropped
+        result.relations_dropped = enforced.relations_dropped
+        kept = enforced.results
+
         existing = _existing_entity_ids(store)
-        resolved = resolve_batch(extraction_results, blueprint, existing)
+        resolved = resolve_batch(kept, blueprint, existing)
         result.resolved_entities = resolved
 
         # --- 3. Build embedding targets ---
@@ -143,7 +169,7 @@ def run_pipeline(
                         )
 
                 # Write entities + MENTIONS edges
-                for er in extraction_results:
+                for er in kept:
                     for entity in er.entities:
                         try:
                             store.write_entity(
@@ -159,7 +185,7 @@ def run_pipeline(
                             )
 
                 # Write relations
-                for er in extraction_results:
+                for er in kept:
                     for relation in er.relations:
                         try:
                             store.write_relation(
@@ -230,6 +256,8 @@ def run_pipeline(
         "embeddings_computed": result.embeddings_written,
         "entities_written": result.entities_written,
         "relations_written": result.relations_written,
+        "entities_dropped": result.entities_dropped,
+        "relations_dropped": result.relations_dropped,
         "chunks_written": result.chunks_written,
         "errors": len(result.errors),
         "drift": result.drift_report.thresholds_exceeded
@@ -262,7 +290,16 @@ def run_update_pipeline(
 
     result = PipelineResult(source_id=source.source_id)
     store_kwargs = store_kwargs or {}
-    embed_kwargs = embed_kwargs or {}
+    embed_kwargs = _embed_kwargs(blueprint, embed_backend, embed_kwargs)
+
+    # Enforce both sides, so a dropped edge is not seen as a change.
+    ontology = blueprint.get("ontology", {})
+    old_extraction_results = enforce_ontology(old_extraction_results, ontology).results
+    enforced = enforce_ontology(new_extraction_results, ontology)
+    result.entities_dropped = enforced.entities_dropped
+    result.relations_dropped = enforced.relations_dropped
+    raw_new_results = new_extraction_results
+    new_extraction_results = enforced.results
 
     try:
         store: GraphStore = store_for(store_backend, **store_kwargs)
@@ -352,7 +389,7 @@ def run_update_pipeline(
             drift = build_drift_report(
                 blueprint=blueprint,
                 source_id=source.source_id,
-                results=new_extraction_results,
+                results=raw_new_results,
                 resolved_entities=resolved,
                 hub_threshold=hub_threshold,
             )
@@ -370,6 +407,8 @@ def run_update_pipeline(
         "embeddings_computed": result.embeddings_written,
         "entities_written": result.entities_written,
         "relations_written": result.relations_written,
+        "entities_dropped": result.entities_dropped,
+        "relations_dropped": result.relations_dropped,
         "chunks_written": result.chunks_written,
         "errors": len(result.errors),
         "drift": result.drift_report.thresholds_exceeded if result.drift_report else [],
@@ -386,6 +425,11 @@ def run_pipeline_report(result: PipelineResult) -> str:
         f"  Relations:       {result.relations_written}",
         f"  Embeddings:      {result.embeddings_written}",
     ]
+    if result.entities_dropped or result.relations_dropped:
+        lines.append(
+            f"  Dropped:         {result.entities_dropped} entities, "
+            f"{result.relations_dropped} relations outside the declared ontology"
+        )
     if result.drift_report:
         lines.append("")
         lines.append(print_report(result.drift_report))

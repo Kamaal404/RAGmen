@@ -60,6 +60,10 @@ class RegistryStore:
     """Transactional SQLite registry adapter."""
 
     def __init__(self, path: str | Path = ":memory:") -> None:
+        # sqlite creates the file but not its directory, and the error it
+        # raises ("unable to open database file") does not say which.
+        if str(path) != ":memory:":
+            Path(path).parent.mkdir(parents=True, exist_ok=True)
         self.connection = sqlite3.connect(str(path), check_same_thread=False)
         self.connection.row_factory = sqlite3.Row
         self.connection.execute("PRAGMA foreign_keys = ON")

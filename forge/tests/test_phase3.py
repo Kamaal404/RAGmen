@@ -502,7 +502,11 @@ class TestPipeline:
         assert result.success
         assert result.chunks_written == 2
         assert result.entities_written >= 4  # entities across both chunks
-        assert result.relations_written >= 2  # REQUIRES_MATERIAL + IGNITES
+        # REQUIRES_MATERIAL is declared. IGNITES is not in the patterns, so the
+        # closed ontology drops it before it reaches the store.
+        assert result.relations_written == 1
+        assert result.relations_dropped == 1
+        assert result.drift_report.total_violations == 1  # still reported
         assert result.embeddings_written > 0
         assert result.drift_report is not None
 

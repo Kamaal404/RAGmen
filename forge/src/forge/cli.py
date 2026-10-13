@@ -365,7 +365,6 @@ def cmd_cook(args: argparse.Namespace) -> None:
         store_backend=args.store,
         embed_backend=args.embed_backend,
         store_kwargs=store_kwargs if args.store == "neo4j" else {},
-        embed_kwargs={"dimensions": 384},
         hub_threshold=args.hub_threshold or 50,
         dry_run=args.dry_run,
     )

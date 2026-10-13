@@ -20,8 +20,10 @@ Tiers (cheapest first):
 
 from __future__ import annotations
 
+import csv
 import hashlib
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from forge.extract.models import ExtractedEntity, ExtractionResult
@@ -58,6 +60,31 @@ class ResolvedEntity:
 # ---------------------------------------------------------------------------
 
 
+def load_vocabulary_csv(source: str) -> dict[str, list[str]]:
+    """Read a vocabulary CSV: header ``canonical,aliases``, aliases ``|``-separated.
+
+    Relative paths resolve against the working directory, the same rule the
+    validator applies to golden_set, so both sides agree on which file it is.
+    """
+    if not source:
+        return {}
+    path = Path(source)
+    if not path.is_absolute():
+        path = Path.cwd() / path
+    if not path.exists():
+        return {}
+
+    entries: dict[str, list[str]] = {}
+    with path.open(encoding="utf-8", newline="") as f:
+        for row in csv.DictReader(f):
+            canon = (row.get("canonical") or "").strip()
+            if not canon:
+                continue
+            aliases = [a.strip() for a in (row.get("aliases") or "").split("|") if a.strip()]
+            entries.setdefault(canon, []).extend(aliases)
+    return entries
+
+
 @dataclass(frozen=True, slots=True)
 class Vocabulary:
     """Controlled vocabulary for one node type.
@@ -81,10 +108,11 @@ class Vocabulary:
         if v is None:
             return None
 
-        # For now, try to load entries from the blueprint itself.
-        # In production these come from a CSV file (v.source).
-        # Fall back to empty entries — resolve will just pass through.
-        entries: dict[str, list[str]] = {}
+        # The spec's vocabulary is the CSV named by `source`. Inline entries
+        # are not spec fields; they remain for tests that build blueprints as
+        # dicts. A missing CSV leaves the vocabulary empty and resolution
+        # passes through, which the validator warns about at design time.
+        entries: dict[str, list[str]] = load_vocabulary_csv(v.get("source", ""))
         raw_entries = v.get("entries", v.get("values", []))
         for entry in raw_entries:
             if isinstance(entry, dict):
@@ -264,7 +292,10 @@ class EntityResolver:
                     if ratio > best[0]:
                         best = (ratio, canonical)
 
-        if best[0] >= threshold:
+        # The blueprint threshold is 0-1; rapidfuzz scores are 0-100. Compared
+        # unscaled, 0.9 accepted almost any pair and collapsed every entity
+        # of a vocabulary-anchored type into its nearest canonical name.
+        if best[0] >= threshold * 100:
             return best[1]
         return None
 
