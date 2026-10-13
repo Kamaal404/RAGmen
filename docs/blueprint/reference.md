@@ -9,8 +9,8 @@ File: `spec/examples/firecraft.blueprint.yaml`
 ## Header
 
 ```yaml
-blueprint_version: 1.0.0
-blueprint_hash: sha256:b0654b60ba440c9440a286e0df08416a2dec2194db4705e6737f36da45568187
+blueprint_version: 1.0.1
+blueprint_hash: sha256:923781d756e1f52e6704119fec841b2457afa49bd99fda319168ca1273f735bd
 name: firecraft
 description: Practical instructional books on fire building, bushcraft and survival.
 ```

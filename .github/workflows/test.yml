@@ -1,0 +1,29 @@
+name: Test
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # Forge first: serve's dev extra depends on lattice-forge, which is not
+      # on PyPI and only resolves once the local package is installed.
+      - name: Install
+        run: |
+          pip install -e "forge[resolve]"
+          pip install -e "serve[dev]"
+          pip install -e agent
+          pip install pytest pytest-asyncio
+
+      - name: Test
+        run: make test

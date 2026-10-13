@@ -82,21 +82,9 @@ def validate_blueprint(bp: dict, strict: bool = False) -> tuple[bool, list[str],
     are treated as errors (is_valid becomes False if any warning exists).
     """
     mod = _load_validator()
-
-    # Reset the shared error/warning lists
-    mod.ERRORS.clear()
-    mod.WARNINGS.clear()
-
-    mod.check_schema(bp)
-    mod.check_structure(bp)
-    mod.check_ontology(bp)
-    mod.check_embedding(bp)
-    mod.check_workload(bp)
-    mod.check_guardrails(bp)
-    mod.check_drift(bp)
-
-    errors = list(mod.ERRORS)
-    warnings = list(mod.WARNINGS)
+    # One entry point, so a check added to the validator is enforced here
+    # without a second edit. Listing the checks by hand let them drift apart.
+    errors, warnings = mod.run_checks(bp)
     is_valid = len(errors) == 0
     if strict:
         is_valid = is_valid and len(warnings) == 0

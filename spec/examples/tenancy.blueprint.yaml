@@ -1,0 +1,169 @@
+# Second reference blueprint: a statute, structurally unlike firecraft.
+# Exists to prove a new corpus type onboards without any change to Forge.
+# Corpus: spec/examples/corpora/tenancy-act.md (invented, not real law).
+blueprint_version: 1.0.0
+blueprint_hash: sha256:fe9abcf3d0a290701360fd147b9969a630e153c060e8c9eade336b7ee93a8d72
+name: tenancy
+description: Residential tenancy statutes, organised into Parts and numbered Articles.
+
+design_note: |
+  Obligation is the central node because every declared question is "what must
+  someone do, or not do". Right is separate from Obligation, not a polarity flag
+  on it: a tenant's right to recover an excess deposit is what users ask about
+  directly, and a boolean is exactly what a traversal forgets to check.
+
+  Party is a node, not a property, because questions start from the party ("what
+  must a landlord do") and the same two parties recur across every Article. It is
+  vocabulary-anchored so "the landlord", "landlords" and "lessor" resolve to one.
+
+  Deadline is a node rather than an Obligation property because users ask for
+  deadlines across obligations ("what are all the time limits"), which is an
+  aggregation over a type, not over a field.
+
+  Considered a Provision type for the Article itself. Rejected: the Article is
+  the chunk, and its number and title are already in the chunk path.
+
+structure:
+  source_types: [markdown]
+  hierarchy:
+    - level: part
+      pattern: '^#\s+Part\s+(\d+)\s*-\s*(.+)$'
+      example: "# Part 2 - Deposits"
+    - level: article
+      pattern: '^##\s+Article\s+(\d+)\s*-\s*(.+)$'
+      example: "## Article 3 - Maximum deposit"
+  chunk_at: article
+  max_chunk_chars: 4000
+  skip_regions:
+    - match: '^#\s+Contents\s*$'
+      span: to_next_heading
+      reason: The contents list repeats every Part title and carries no obligations.
+
+ontology:
+  closed: true
+  node_types:
+    - label: Party
+      description: A role that holds duties or rights under the statute, such as landlord or tenant.
+      answers: "Who is bound by this?"
+      properties:
+        - {name: name, type: STRING, required: true}
+    - label: Obligation
+      description: Something a party must do or must not do, as stated in an Article.
+      answers: "What must the landlord do?"
+      properties:
+        - {name: name, type: STRING, required: true}
+        - {name: polarity, type: STRING, enum: [must, must_not]}
+    - label: Right
+      description: Something a party may do or may claim, as stated in an Article.
+      answers: "What can the tenant claim?"
+      properties:
+        - {name: name, type: STRING, required: true}
+    - label: Deadline
+      description: A time limit attached to an obligation, such as fourteen days or twenty-four hours notice.
+      answers: "How long does the landlord have?"
+      properties:
+        - {name: name, type: STRING, required: true}
+        - {name: days, type: FLOAT}
+    - label: Exception
+      description: A circumstance in which an obligation or right does not apply, such as an emergency or a holiday let.
+      answers: "When does this not apply?"
+      properties:
+        - {name: name, type: STRING, required: true}
+
+  relationship_types:
+    - label: OWES
+      description: This party is bound by this obligation.
+    - label: HOLDS
+      description: This party holds this right.
+    - label: DUE_WITHIN
+      description: This obligation must be met within this deadline.
+    - label: EXCEPT_WHEN
+      description: This obligation or right does not apply in this circumstance.
+    - label: ENFORCES
+      description: Exercising this right enforces this obligation owed by the other party.
+
+  patterns:
+    - [Party, OWES, Obligation]
+    - [Party, HOLDS, Right]
+    - [Obligation, DUE_WITHIN, Deadline]
+    - [Obligation, EXCEPT_WHEN, Exception]
+    - [Right, EXCEPT_WHEN, Exception]
+    - [Right, ENFORCES, Obligation]
+
+  vocabularies:
+    Party:
+      source: vocab/parties.csv
+      tiers: [exact, fuzzy]
+      fuzzy_threshold: 0.9
+
+  resolution:
+    - labels: [Party]
+      strategy: vocabulary
+    - labels: [Obligation, Right, Exception]
+      strategy: fuzzy
+      threshold: 0.9
+    - labels: [Deadline]
+      strategy: exact
+
+embedding:
+  provider: local
+  model: all-MiniLM-L6-v2
+  dimensions: 384
+  similarity: cosine
+  multi_vector: false
+  cache: content_hash
+  targets:
+    - name: article_text
+      of: Chunk
+      text: "{path}\n\n{text}"
+    - name: duty_card
+      of: [Obligation, Right]
+      text: "{label}: {name}"
+  hybrid:
+    enabled: true
+    fusion: rrf
+
+workload:
+  golden_set: eval/tenancy.jsonl
+  baseline: true
+  shapes:
+    - id: what_is_deposit_cap
+      kind: lookup
+      example: "what is the maximum deposit"
+      hops: 0
+    - id: landlord_deadlines
+      kind: multi_hop
+      example: "what must a landlord do, and by when"
+      hops: 2
+      must_traverse: [OWES, DUE_WITHIN]
+      must_return: [Obligation, Deadline]
+    - id: tenant_remedies
+      kind: multi_hop
+      example: "what can a tenant do if the landlord takes too large a deposit"
+      hops: 2
+      must_traverse: [HOLDS, ENFORCES]
+    - id: entry_without_notice
+      kind: negative
+      example: "when can the landlord enter without notice"
+      hops: 1
+      must_traverse: [EXCEPT_WHEN]
+
+guardrails:
+  # A later amending statute supersedes an earlier one; surfacing both would
+  # present repealed law as current.
+  conflict_policy: prefer_newest
+  answer_policy:
+    require_citation: true
+    refuse_outside_corpus: true
+
+drift:
+  max_unmapped_mention_rate: 0.15
+  max_vocabulary_miss_rate: 0.10
+  max_degree: 300
+  max_degree_exempt: [landlord, tenant]
+  min_provenance_coverage: 0.85
+
+provenance:
+  require_quote: true
+  require_page: false
+  quote_max_chars: 300

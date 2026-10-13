@@ -27,6 +27,7 @@ help:
 	@echo "current: BLUEPRINT=$(BLUEPRINT)"
 
 test:
+	bash tests/test_blueprint.sh
 	cd forge && python -m pytest -q --tb=short -W ignore::DeprecationWarning
 	cd serve && python -m pytest -q --tb=short -W ignore::DeprecationWarning
 	cd agent && python -m pytest -q --tb=short -W ignore::DeprecationWarning

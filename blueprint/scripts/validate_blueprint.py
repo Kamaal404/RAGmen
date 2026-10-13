@@ -308,6 +308,112 @@ def check_drift(bp: dict) -> None:
         )
 
 
+# ------------------------------------------------------------ forge contract
+#
+# The spec describes what a blueprint may say. These rules describe what Forge
+# can currently execute. A blueprint that passes the spec but not these fails
+# at build time instead, unattended, after money has been spent. Keep this
+# section in step with Forge: when Forge gains a loader or a template field,
+# relax the rule here in the same change.
+
+FORGE_LOADERS = {"pdf", "markdown", "text", "html"}
+FORGE_EMBED_PROVIDERS = {"local"}
+FORGE_RESOLUTION_TIERS = {"exact", "fuzzy"}
+# Fields Forge supplies when it renders an embedding template. format() raises
+# on anything else, and that takes down the whole embedding step for a source.
+CHUNK_TEMPLATE_FIELDS = {"path", "text"}
+ENTITY_TEMPLATE_FIELDS = {"name", "label"}
+
+
+def check_forge_contract(bp: dict) -> None:
+    st = bp.get("structure", {})
+    for t in st.get("source_types", []):
+        if t not in FORGE_LOADERS:
+            err(
+                f"structure.source_types: Forge has no loader for '{t}' "
+                f"(it loads {', '.join(sorted(FORGE_LOADERS))}). Convert the sources first."
+            )
+
+    em = bp.get("embedding", {})
+    provider = em.get("provider", "local")
+    if provider not in FORGE_EMBED_PROVIDERS:
+        err(
+            f"embedding.provider: Forge has no '{provider}' embedder "
+            f"(it has {', '.join(sorted(FORGE_EMBED_PROVIDERS))})."
+        )
+
+    for t in em.get("targets", []):
+        of = t["of"] if isinstance(t["of"], list) else [t["of"]]
+        fields = set(re.findall(r"\{(\w+)\}", t.get("text", "")))
+        if "Chunk" in of:
+            for f in sorted(fields - CHUNK_TEMPLATE_FIELDS):
+                err(
+                    f"embedding.targets[{t['name']}]: chunk template uses {{{f}}}; "
+                    f"Forge only supplies {{path}} and {{text}} to chunk templates"
+                )
+        if any(label != "Chunk" for label in of):
+            for f in sorted(fields - ENTITY_TEMPLATE_FIELDS):
+                err(
+                    f"embedding.targets[{t['name']}]: entity template uses {{{f}}}; "
+                    f"Forge only supplies {{name}} and {{label}} to entity templates"
+                )
+
+    for label, v in bp.get("ontology", {}).get("vocabularies", {}).items():
+        unbuilt = [t for t in v.get("tiers", []) if t not in FORGE_RESOLUTION_TIERS]
+        if unbuilt:
+            warn(
+                f"ontology.vocabularies[{label}]: Forge does not implement tiers "
+                f"{unbuilt} yet. Mentions that miss exact and fuzzy become new "
+                "entities instead of anchoring to the vocabulary."
+            )
+        p = Path(v["source"])
+        if not p.is_absolute():
+            p = Path.cwd() / p
+        if not p.exists():
+            warn(
+                f"ontology.vocabularies[{label}]: '{v['source']}' does not exist. "
+                "Resolution for this type passes through unanchored until it does."
+            )
+            continue
+        header = p.read_text(encoding="utf-8").splitlines()[:1]
+        cols = [c.strip() for c in header[0].split(",")] if header else []
+        if "canonical" not in cols:
+            err(
+                f"ontology.vocabularies[{label}]: '{v['source']}' has no 'canonical' "
+                "column. Forge reads a CSV with header canonical,aliases "
+                "(aliases separated by |)."
+            )
+
+    if st.get("xref_patterns"):
+        warn(
+            "structure.xref_patterns: Forge does not parse cross-references yet. "
+            "Deterministic relations will be declared and excluded from extraction "
+            "but never written, so shapes that traverse them will come back empty."
+        )
+
+
+CHECKS = (
+    check_schema,
+    check_structure,
+    check_ontology,
+    check_embedding,
+    check_workload,
+    check_guardrails,
+    check_drift,
+    check_forge_contract,
+)
+
+
+def run_checks(bp: dict) -> tuple[list[str], list[str]]:
+    """Run every check and return (errors, warnings). Forge calls this too, so
+    adding a check here is enough for both sides to enforce it."""
+    ERRORS.clear()
+    WARNINGS.clear()
+    for check in CHECKS:
+        check(bp)
+    return list(ERRORS), list(WARNINGS)
+
+
 # -------------------------------------------------------------------- hashing
 
 def compute_hash(bp: dict) -> str:
@@ -334,13 +440,7 @@ def main() -> None:
     if not isinstance(bp, dict):
         sys.exit("blueprint must be a mapping")
 
-    check_schema(bp)
-    check_structure(bp)
-    check_ontology(bp)
-    check_embedding(bp)
-    check_workload(bp)
-    check_guardrails(bp)
-    check_drift(bp)
+    run_checks(bp)
 
     for e in ERRORS:
         print(f"ERROR  {e}")

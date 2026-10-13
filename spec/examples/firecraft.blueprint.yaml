@@ -1,7 +1,7 @@
 # Reference blueprint. Exercises every section of the spec.
 # Domain: practical fire-building and bushcraft manuals.
-blueprint_version: 1.0.0
-blueprint_hash: sha256:b0654b60ba440c9440a286e0df08416a2dec2194db4705e6737f36da45568187
+blueprint_version: 1.0.1
+blueprint_hash: sha256:923781d756e1f52e6704119fec841b2457afa49bd99fda319168ca1273f735bd
 name: firecraft
 description: Practical instructional books on fire building, bushcraft and survival.
 
@@ -185,13 +185,16 @@ embedding:
       of: Chunk
       text: "{path}\n\n{text}"
       facet: passage
+    # Entity cards can use only {name} and {label}: resolved entities do not
+    # carry their properties or neighbours through to embedding yet. Richer
+    # cards (purposes, substitutes) need Forge to supply those fields first.
     - name: procedure_card
       of: [Procedure, Technique]
-      text: "{name}. {description} Used for: {purposes}. Avoid when: {avoid_when}."
+      text: "{label}: {name}"
       facet: identity
     - name: material_card
       of: Material
-      text: "{name}, used as {role}. Substitutes: {substitutes}."
+      text: "{label}: {name}"
       facet: materials
   hybrid:
     enabled: true

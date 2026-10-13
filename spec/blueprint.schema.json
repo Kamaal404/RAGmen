@@ -298,7 +298,11 @@
         "max_vocabulary_miss_rate": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.10 },
         "max_degree": { "type": "integer", "minimum": 10, "default": 300 },
         "max_degree_exempt": { "type": "array", "items": { "type": "string" } },
-        "min_provenance_coverage": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.85 }
+        "min_provenance_coverage": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.85 },
+        "fail_on_exceeded": {
+          "type": "boolean", "default": false,
+          "description": "Make Forge report a build as failed when any threshold is exceeded, instead of only warning. Off by default: the first builds of a new blueprint are expected to trip thresholds."
+        }
       }
     },
 
